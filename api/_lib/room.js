@@ -56,6 +56,9 @@ export async function joinRoom(code, name) {
   if (!room) return { error: 'Room not found', code: 404 };
   if (room.status !== 'waiting' && !room.players.b) return { error: 'Room is full', code: 400 };
   room.players.b = { name };
+  // game starts as soon as the second player joins
+  room.started = true;
+  room.status = 'playing';
   await saveRoom(room);
   return { room };
 }

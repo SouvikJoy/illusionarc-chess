@@ -43,9 +43,11 @@ export async function redisSet(key, value, ttlSeconds) {
     memory.set(key, JSON.parse(JSON.stringify(value)));
     return;
   }
-  let path = `set/${key}`;
+  // Upstash REST: value goes in the path (URL-encoded); TTL as /ex/<seconds>.
+  const encoded = encodeURIComponent(JSON.stringify(value));
+  let path = `set/${key}/${encoded}`;
   if (ttlSeconds) path += `/ex/${ttlSeconds}`;
-  await req(path, { method: 'POST', body: JSON.stringify(value) });
+  await req(path, { method: 'POST' });
 }
 
 export async function redisDel(key) {
