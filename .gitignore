@@ -1,0 +1,20 @@
+# dependencies
+node_modules/
+*.log
+
+# build output
+dist/
+build/
+
+# environment
+.env
+.env.local
+.vercel/
+
+# os / editor
+.DS_Store
+Thumbs.db
+*.swp
+
+# secrets — never commit keys/tokens
+gmail_token.json
