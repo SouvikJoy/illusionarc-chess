@@ -15,7 +15,6 @@ import { NetClient } from './net/client.js';
 import { showPromotion } from './ui/promotion.js';
 import { button, el, toast } from './ui/dom.js';
 import { emit, on } from './shared/eventbus.js';
-import { MSG } from './shared/protocol.js';
 import {
   getSettings, updateSettings, loadSettings, subscribe,
 } from './ui/settings.js';
@@ -144,66 +143,88 @@ class App {
     if (action === 'host') {
       this.screens.lobbyStatus('Creating room…');
       this._connect();
-      this.net.host();
+      this.net.host().catch((e) => {
+        this.screens.lobbyStatus('Could not create room: ' + e.message);
+      });
     } else if (action === 'join') {
       if (!code) { this.screens.lobbyStatus('Enter a room code first'); return; }
       this.screens.lobbyStatus('Joining…');
       this._connect();
-      this.net.join(code);
+      this.net.join(code).catch((e) => {
+        this.screens.lobbyStatus(e.status === 404 ? 'Room not found — check the code' : 'Could not join: ' + e.message);
+      });
     }
   }
 
   _connect() {
     if (this.net) return;
-    this.net = new NetClient(wsUrl());
+    this.net = new NetClient();
     this._bindNet();
-    this.net.connect(wsUrl()).catch((e) => {
-      this.screens.lobbyStatus('Could not connect to server: ' + e.message);
-    });
   }
 
   _bindNet() {
     const net = this.net;
-    net.on(MSG.ROOM_CREATED, (d) => {
-      this.screens.lobbyStatus('Room created. Code: ' + d.code);
-      toast('Share code: ' + d.code, { layer: this.toastLayer, type: 'info', duration: 4000 });
+    net.on('room_created', (d) => {
       this.roomCode = d.code;
+      this.screens.lobbyStatus('Room created. Share code: ' + d.code);
+      toast('Share code: ' + d.code, { layer: this.toastLayer, type: 'info', duration: 5000 });
     });
-    net.on(MSG.ROOM_JOINED, (d) => {
+    net.on('room_joined', (d) => {
       this.roomCode = d.code;
       this.screens.lobbyStatus('Joined room ' + d.code);
     });
-    net.on(MSG.STATE_ASSIGNED, (d) => {
+    net.on('state_assigned', (d) => {
       this.playerColor = d.color;
       this.screens.lobbyStatus(d.color === 'w' ? 'You are White. Waiting for opponent…' : 'You are Black. Waiting for opponent…');
     });
-    net.on(MSG.GAME_STARTED, (d) => {
+    net.on('game_started', () => {
+      this._gameStarted = true;
+      this._newGame();
       this.mode = 'online';
-      this.game = new Game(d.fen || undefined);
       this.gameMode = 'online';
       this.screens.lobbyStatus('');
       this._renderBoardScreen();
     });
-    net.on(MSG.STATE, (d) => this._applyRemote(d));
-    net.on(MSG.STATE_SYNC, (d) => {
-      this.game = new Game(d.fen || undefined);
-      this.gameMode = 'online';
-      this._renderBoardScreen();
+    net.on('opponent_moves', (d) => this._applyRemoteMoves(d.moves));
+    net.on('game_result', (d) => {
+      if (this.gameOverShown) return;
+      const { result } = d;
+      const winnerColor = result.winner;
+      let win;
+      if (winnerColor == null) win = false;
+      else win = winnerColor === this.playerColor;
+      const title = this._resultTitle(result);
+      this._end({ title, win, online: true });
     });
-    net.on(MSG.OPPONENT_QUIT, () => {
-      toast('Opponent left the game.', { layer: this.toastLayer, type: 'error' });
-      this._end({ title: 'Opponent left', subtitle: 'The game was abandoned.', win: false, online: true });
-    });
-    net.on(MSG.OPPONENT_MOVE, (m) => {
-      if (this.aiThinking) return;
-    });
-    net.on(MSG.ERROR, (d) => {
-      toast(d.message || 'Error', { layer: this.toastLayer, type: 'error' });
-    });
-    net.on(MSG.REMATCH_REQUESTED, () => {
+    net.on('rematch_requested', () => {
       this._pendingRematch = true;
       toast(this.opponentName() + ' wants a rematch', { layer: this.toastLayer, type: 'info', duration: 4000 });
     });
+    net.on('draw_requested', (d) => {
+      if (d.from === this.playerColor) return;
+      this._pendingDraw = d.from;
+      toast('Opponent offers a draw. Tap the button to accept.', { layer: this.toastLayer, type: 'info', duration: 5000 });
+    });
+    net.on('opponent_quit', () => {
+      toast('Opponent left the game.', { layer: this.toastLayer, type: 'error' });
+      this._end({ title: 'Opponent left', subtitle: 'The game was abandoned.', win: false, online: true });
+    });
+  }
+
+  _resultTitle(result) {
+    const type = result && result.type;
+    const winner = result && result.winner;
+    const who = winner ? (winner === 'w' ? 'White' : 'Black') : '';
+    const map = {
+      checkmate: `${who} wins by checkmate`,
+      stalemate: 'Draw by stalemate',
+      insufficient: 'Draw by insufficient material',
+      fifty: 'Draw by 50-move rule',
+      threefold: 'Draw by threefold repetition',
+      resign: `${who} wins — resignation`,
+      agreement: 'Draw by agreement',
+    };
+    return (map[type] || 'Game over') + (winner === this.playerColor ? ' — You win!' : '');
   }
 
   _newGame() {
@@ -214,6 +235,11 @@ class App {
     this.pendingPromotion = null;
     this._winner = null;
     this.remoteSans = [];
+    this._moveInFlight = false;
+    this._lastSentMove = null;
+    this._gameStarted = false;
+    this._pendingRematch = false;
+    this._pendingDraw = null;
   }
 
   // ------- render board screen -------
@@ -273,8 +299,7 @@ class App {
     this.hud.setPlayers(players);
     this.hud.setTurn(this.game.turn);
     this.hud.clearMoves();
-    const sans = this.mode === 'online' && this.remoteSans && this.remoteSans.length ? this.remoteSans : this.game.history.map((h) => h.san);
-    for (const san of sans) this.hud.addMove(san);
+    for (const h of this.game.history) this.hud.addMove(h.san);
     this.hud.setStatus(this._statusText(), this._statusClass());
     this._renderStatusCheck();
   }
@@ -393,6 +418,11 @@ class App {
   }
 
   _applyMove(move) {
+    if (this.mode === 'online') {
+      // server-authoritative: send move, apply once confirmed via poll
+      this._sendOnlineMove(move);
+      return;
+    }
     const moverColor = colorOf(this.game.board[move.from]);
     const capturedBefore = move.captured;
     const wasCastle = move.flags && move.flags.castle;
@@ -412,6 +442,43 @@ class App {
       promotionKind: wasPromo ? (move.flags.promo) : null,
       castledRook: wasCastle ? this._castledRookIdx(move, moverColor) : -1,
     });
+  }
+
+  // In online mode, submit the move to the authoritative server. We optimistically
+  // apply locally for immediate feedback; the poll reconciles authoritative state.
+  _sendOnlineMove(move) {
+    if (this._moveInFlight) return;
+    this._moveInFlight = true;
+    this._lastSentMove = { from: move.from, to: move.to };
+    this.net.move(move)
+      .then(() => {
+        // apply locally (server confirmed the move is legal via its own engine)
+        const moverColor = colorOf(this.game.board[move.from]);
+        const wasCastle = move.flags && move.flags.castle;
+        const wasPromo = move.flags && move.flags.promo;
+        const capturedIdx = move.captured ? move.to : -1;
+        const enPassantIdx = move.flags && move.flags.enPassant ? this._epCapturedIdx(move, moverColor) : -1;
+        const result = this.game.move(move.from, move.to, move.flags && move.flags.promo);
+        this._onMoveMade(result.san, {
+          castle: wasCastle,
+          promo: wasPromo,
+          capturedIdx: capturedIdx >= 0 ? capturedIdx : enPassantIdx,
+          captured: move.captured,
+          from: move.from,
+          to: move.to,
+          square: nameOfSquare(move.to),
+          enPassant: enPassantIdx >= 0,
+          promotionKind: wasPromo ? (move.flags.promo) : null,
+          castledRook: wasCastle ? this._castledRookIdx(move, moverColor) : -1,
+        });
+      })
+      .catch(() => {
+        toast('Move rejected by server', { layer: this.toastLayer, type: 'error' });
+        this._moveInFlight = false;
+        this._lastSentMove = null;
+        this.selected = -1;
+        this._applyHighlights();
+      });
   }
 
   _epCapturedIdx(move, moverColor) {
@@ -567,6 +634,7 @@ class App {
     this.gameOverShown = false;
     if (this.mode === 'online') {
       this.net && this.net.rematchOffer();
+      this.screens.showMenu();
     } else {
       this._newGame();
       this._renderBoardScreen();
@@ -577,39 +645,64 @@ class App {
     this.gameOverShown = false;
     this.screens.clear();
     this.mode = null;
+    this._gameStarted = false;
     if (this.net) { this.net.close(); this.net = null; }
     this.screens.showMenu();
   }
 
   _pause() {
-    const res = this.game.result();    this.screens.showPause({
+    this.screens.showPause({
       onResume: () => { playSfx('close'); this._renderBoardScreen(); },
-      onResign: () => { this._end({ title: 'You resigned', subtitle: 'You resigned the game.', win: false }); },
+      onResign: () => {
+        if (this.mode === 'online') {
+          this.net && this.net.resign();
+          this._end({ title: 'You resigned', subtitle: 'You resigned the game.', win: false, online: true });
+        } else {
+          this._end({ title: 'You resigned', subtitle: 'You resigned the game.', win: false });
+        }
+      },
       onNewGame: () => { this._newGame(); this._renderBoardScreen(); },
       onMenu: () => this._quitToMenu(),
     });
   }
 
-  _applyRemote(d) {
-    // authoritative state update from server
-    if (d.fen) {
-      this.game = new Game(d.fen);
-      this.selected = -1;
-      if (d.san && this.remoteSans) {
-        this.remoteSans.push(d.san);
-      } else if (d.resign) {
-        this._end({ title: d.winner === this.playerColor ? 'Opponent resigned — You win' : 'You resigned', subtitle: 'Resignation', win: d.winner === this.playerColor });
+  // Apply moves that arrived from the server (opponent moves + confirmations).  // The player's own move is applied locally right after the server confirms it,
+  // so here we skip any move that matches the player's just-sent move.
+  _applyRemoteMoves(moves) {
+    if (!moves || !moves.length) return;
+    for (const m of moves) {
+      const from = m.from;
+      const to = m.to;
+      // Skip if this is the player's own last move (already applied locally).
+      if (this._lastSentMove && this._lastSentMove.from === from && this._lastSentMove.to === to) {
+        this._lastSentMove = null;
+        this._moveInFlight = false;
+        continue;
       }
-      this._renderBoardScreen();
+      // It's an opponent move (or a replay): apply to the local engine.
+      const legal = this.game.legalMoves(from);
+      const mv = legal.find((x) => x.to === to);
+      if (!mv) continue;
+      const moverColor = colorOf(this.game.board[from]);
+      const capturedIdx = mv.captured ? mv.to : -1;
+      const enPassantIdx = mv.flags && mv.flags.enPassant ? this._epCapturedIdx(mv, moverColor) : -1;
+      const result = this.game.move(from, to, mv.flags && mv.flags.promo);
+      this._onMoveMade(result.san, {
+        castle: !!(mv.flags && mv.flags.castle),
+        promo: !!(mv.flags && mv.flags.promo),
+        capturedIdx: capturedIdx >= 0 ? capturedIdx : enPassantIdx,
+        captured: mv.captured,
+        from,
+        to,
+        square: nameOfSquare(to),
+        enPassant: enPassantIdx >= 0,
+        promotionKind: mv.flags && mv.flags.promo ? mv.flags.promo : null,
+        castledRook: mv.flags && mv.flags.castle ? this._castledRookIdx(mv, moverColor) : -1,
+      });
+      this._moveInFlight = false;
     }
+    this._renderHud();
   }
-}
-
-function wsUrl() {
-  const proto = location.protocol === 'https:' ? 'wss' : 'ws';
-  const host = location.host;
-  const base = proto + '://' + host;
-  return base;
 }
 
 export default App;

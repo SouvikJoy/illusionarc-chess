@@ -18,3 +18,4 @@ Thumbs.db
 
 # secrets — never commit keys/tokens
 gmail_token.json
+.vercel

@@ -1,50 +1,21 @@
 // net/client.js
-// WebSocket client + message protocol (per shared/protocol.js).
-import { MSG, encode, decode } from '../shared/protocol.js';
+// Multiplayer client for Vercel: HTTP + polling (no WebSocket server needed).
+// Server-authoritative: moves are validated on the server (shared engine),
+// the client polls /api/state and reconciles.
 import { setupName } from './name.js';
 
+const BASE = typeof window !== 'undefined' ? window.location.origin : '';
+const POLL_MS = 800;
+
 export class NetClient {
-  constructor(url) {
-    this.url = url;
-    this.ws = null;
-    this.handlers = new Map(); // MSG -> fn
+  constructor() {
     this.roomCode = null;
-    this.playerColor = null; // 'w' | 'b'
+    this.playerColor = null;
+    this.handlers = new Map(); // msg type -> fn
     this.connected = false;
-    this._queue = [];
-  }
-
-  connect(url = this.url) {
-    return new Promise((resolve, reject) => {
-      const ws = new WebSocket(url || this.url);
-      this.ws = ws;
-      ws.onopen = () => {
-        this.connected = true;
-        const q = this._queue;
-        this._queue = [];
-        for (const m of q) this.send(m.type, m.data);
-        resolve();
-      };
-      ws.onerror = () => { this.connected = false; reject(new Error('Connection failed')); };
-      ws.onmessage = (e) => this._dispatch(decode(e.data));
-      ws.onclose = () => { this.connected = false; this._fired('opponent_quit', { reason: 'connection_closed' }); };
-    });
-  }
-
-  send(type, data = {}) {
-    if (!this.ws) return;
-    if (this.ws.readyState === WebSocket.OPEN) {
-      this.ws.send(encode(type, data));
-    } else if (this.ws.readyState === WebSocket.CONNECTING) {
-      this._queue.push({ type, data });
-    }
-  }
-
-  _dispatch(msg) {
-    if (!msg) return;
-    const fn = this.handlers.get(msg.type);
-    if (fn) fn(msg.data || {});
-    else this._fired(msg.type, msg.data || {});
+    this.pollTimer = null;
+    this._since = 0;
+    this._disposed = false;
   }
 
   on(type, fn) {
@@ -52,26 +23,126 @@ export class NetClient {
     else { const prev = this.handlers.get(type); this.handlers.set(type, (d) => { prev(d); fn(d); }); }
   }
 
-  _fired(type, data) {
+  _fire(type, data = {}) {
     const fn = this.handlers.get(type);
     if (fn) fn(data);
   }
 
-  close() {
-    try { this.ws && this.ws.close(); } catch {}
+  async _post(path, body) {
+    const res = await fetch(`${BASE}/api/${path}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) {
+      const err = new Error(data.error || `HTTP ${res.status}`);
+      err.status = res.status;
+      throw err;
+    }
+    return data;
   }
 
-  // helpers
-  host() { this.send(MSG.CREATE_ROOM, { name: setupName() }); return this; }
-  join(code) { this.send(MSG.JOIN_ROOM, { code, name: setupName() }); return this; }
-  chooseColor(color) { this.send(MSG.CHOOSE_COLOR, { color }); return this; }
-  start() { this.send(MSG.START); return this; }
-  move(m) { this.send(MSG.MOVE, { from: m.from, to: m.to, promotion: m.promo }); return this; }
-  resign() { this.send(MSG.RESIGN); return this; }
-  drawOffer() { this.send(MSG.DRAW_OFFER); return this; }
-  drawAccept() { this.send(MSG.DRAW_ACCEPT); return this; }
-  drawDecline() { this.send(MSG.DRAW_DECLINE); return this; }
-  rematchOffer() { this.send(MSG.REMATCH_OFFER); return this; }
-  rematchAccept() { this.send(MSG.REMATCH_ACCEPT); return this; }
-  resumeThen(code) { this.send(MSG.RESUME, { code }); return this; }
+  async _get(path) {
+    const res = await fetch(`${BASE}/api/${path}`);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || data.error) {
+      const err = new Error(data.error || `HTTP ${res.status}`);
+      err.status = res.status;
+      throw err;
+    }
+    return data;
+  }
+
+  // ---- lobby ----
+  async host() {
+    const data = await this._post('room/create', { name: setupName() });
+    this.roomCode = data.code;
+    this.playerColor = data.color;
+    this.connected = true;
+    this._fire('room_created', { code: data.code });
+    this._fire('state_assigned', { color: data.color });
+    this._startPoll();
+    return data;
+  }
+
+  async join(code) {
+    const data = await this._post('room/join', { code, name: setupName() });
+    this.roomCode = data.code;
+    this.playerColor = data.color;
+    this.connected = true;
+    this._fire('room_joined', { code: data.code });
+    this._fire('state_assigned', { color: data.color });
+    this._startPoll();
+    return data;
+  }
+
+  // ---- in-game ----
+  async move(m) {
+    const data = await this._post('move', {
+      code: this.roomCode,
+      color: this.playerColor,
+      from: m.from,
+      to: m.to,
+      promo: m.flags && m.flags.promo ? m.flags.promo : undefined,
+    });
+    return data;
+  }
+
+  async resign() {
+    return this._post('resign', { code: this.roomCode, color: this.playerColor });
+  }
+
+  async drawOffer() {
+    return this._post('draw', { code: this.roomCode, color: this.playerColor });
+  }
+
+  async drawAccept() {
+    return this._post('draw', { code: this.roomCode, color: this.playerColor, accept: true });
+  }
+
+  async rematchOffer() {
+    return this._post('rematch', { code: this.roomCode, color: this.playerColor });
+  }
+
+  close() {
+    this._disposed = true;
+    if (this.pollTimer) clearTimeout(this.pollTimer);
+    this.pollTimer = null;
+    this.connected = false;
+  }
+
+  // ---- polling loop ----
+  _startPoll() {
+    this.poll();
+  }
+
+  async poll() {
+    if (this._disposed) return;
+    try {
+      const data = await this._get(`state?code=${this.roomCode}&since=${this._since}`);
+      this._fire('poll', data);
+      this._since = data.movesTotal;
+      // reconcile new moves
+      if (data.moves && data.moves.length) {
+        this._fire('opponent_moves', { moves: data.moves });
+      }
+      if (data.status === 'over' && data.result) {
+        this._fire('game_result', { result: data.result });
+      }
+      if (data.status === 'playing' && data.started && !this._gameStarted) {
+        this._gameStarted = true;
+        this._fire('game_started', {});
+      }
+      if (data.rematchVotes && (data.rematchVotes.w || data.rematchVotes.b)) {
+        this._fire('rematch_requested', { votes: data.rematchVotes });
+      }
+      if (data.drawOffer) {
+        this._fire('draw_requested', { from: data.drawOffer });
+      }
+    } catch (err) {
+      // transient errors: keep polling
+    }
+    if (!this._disposed) this.pollTimer = setTimeout(() => this.poll(), POLL_MS);
+  }
 }
