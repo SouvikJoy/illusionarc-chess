@@ -10,7 +10,7 @@ export function showPromotion(color, onPick) {
   layer.innerHTML = '';
   const scrim = el('div', { class: 'modal-scrim' });
   const panel = el('div', { class: 'modal promotion-panel' });
-  const title = el('div', { class: 'modal-title' }, 'Promote to');
+  const title = el('div', { class: 'modal-title' }, 'পদোন্নতি');
   const row = el('div', { class: 'promo-row' });
   const kinds = ['Q', 'R', 'B', 'N'];
   for (const k of kinds) {

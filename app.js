@@ -141,17 +141,17 @@ class App {
   handleOnlineMenu(action, code) {
     resumeAudio();
     if (action === 'host') {
-      this.screens.lobbyStatus('Creating room…');
+      this.screens.lobbyStatus('রুম তৈরি হচ্ছে…');
       this._connect();
       this.net.host().catch((e) => {
-        this.screens.lobbyStatus('Could not create room: ' + e.message);
+        this.screens.lobbyStatus('রুম তৈরি করা যায়নি: ' + e.message);
       });
     } else if (action === 'join') {
-      if (!code) { this.screens.lobbyStatus('Enter a room code first'); return; }
-      this.screens.lobbyStatus('Joining…');
+      if (!code) { this.screens.lobbyStatus('প্রথমে রুম কোড লিখুন'); return; }
+      this.screens.lobbyStatus('যোগ দেওয়া হচ্ছে…');
       this._connect();
       this.net.join(code).catch((e) => {
-        this.screens.lobbyStatus(e.status === 404 ? 'Room not found — check the code' : 'Could not join: ' + e.message);
+        this.screens.lobbyStatus(e.status === 404 ? 'রুম পাওয়া যায়নি — কোডটি মিলিয়ে দেখুন' : 'যোগ দেওয়া যায়নি: ' + e.message);
       });
     }
   }
@@ -166,16 +166,16 @@ class App {
     const net = this.net;
     net.on('room_created', (d) => {
       this.roomCode = d.code;
-      this.screens.lobbyStatus('Room created. Share code: ' + d.code);
-      toast('Share code: ' + d.code, { layer: this.toastLayer, type: 'info', duration: 5000 });
+      this.screens.lobbyStatus('রুম তৈরি হয়েছে। কোড শেয়ার করুন: ' + d.code);
+      toast('কোড শেয়ার করুন: ' + d.code, { layer: this.toastLayer, type: 'info', duration: 5000 });
     });
     net.on('room_joined', (d) => {
       this.roomCode = d.code;
-      this.screens.lobbyStatus('Joined room ' + d.code);
+      this.screens.lobbyStatus('রুমে যোগ দিয়েছেন ' + d.code);
     });
     net.on('state_assigned', (d) => {
       this.playerColor = d.color;
-      this.screens.lobbyStatus(d.color === 'w' ? 'You are White. Waiting for opponent…' : 'You are Black. Waiting for opponent…');
+      this.screens.lobbyStatus(d.color === 'w' ? 'আপনি সবুজ। প্রতিপক্ষের অপেক্ষায়…' : 'আপনি লাল। প্রতিপক্ষের অপেক্ষায়…');
     });
     net.on('game_started', () => {
       this._gameStarted = true;
@@ -198,33 +198,33 @@ class App {
     });
     net.on('rematch_requested', () => {
       this._pendingRematch = true;
-      toast(this.opponentName() + ' wants a rematch', { layer: this.toastLayer, type: 'info', duration: 4000 });
+      toast(this.opponentName() + ' আবার খেলতে চান', { layer: this.toastLayer, type: 'info', duration: 4000 });
     });
     net.on('draw_requested', (d) => {
       if (d.from === this.playerColor) return;
       this._pendingDraw = d.from;
-      toast('Opponent offers a draw. Tap the button to accept.', { layer: this.toastLayer, type: 'info', duration: 5000 });
+      toast('প্রতিপক্ষ ড্র-এর প্রস্তাব দিয়েছেন। মেনে নিতে বোতামে চাপুন।', { layer: this.toastLayer, type: 'info', duration: 5000 });
     });
     net.on('opponent_quit', () => {
-      toast('Opponent left the game.', { layer: this.toastLayer, type: 'error' });
-      this._end({ title: 'Opponent left', subtitle: 'The game was abandoned.', win: false, online: true });
+      toast('প্রতিপক্ষ গেম ছেড়ে চলে গেছেন।', { layer: this.toastLayer, type: 'error' });
+      this._end({ title: 'প্রতিপক্ষ চলে গেছেন', subtitle: 'খেলাটি ত্যাগ করা হয়েছে।', win: false, online: true });
     });
   }
 
   _resultTitle(result) {
     const type = result && result.type;
     const winner = result && result.winner;
-    const who = winner ? (winner === 'w' ? 'White' : 'Black') : '';
+    const who = winner ? (winner === 'w' ? 'সবুজ' : 'লাল') : '';
     const map = {
-      checkmate: `${who} wins by checkmate`,
-      stalemate: 'Draw by stalemate',
-      insufficient: 'Draw by insufficient material',
-      fifty: 'Draw by 50-move rule',
-      threefold: 'Draw by threefold repetition',
-      resign: `${who} wins — resignation`,
-      agreement: 'Draw by agreement',
+      checkmate: `${who} কিস্তিমাতে জিতেছেন`,
+      stalemate: 'স্টালমেটে ড্র',
+      insufficient: 'অপর্যাপ্ত গুটিতে ড্র',
+      fifty: '৫০-মুভ নিয়মে ড্র',
+      threefold: 'তিনবার পুনরাবৃত্তিতে ড্র',
+      resign: `${who} জিতেছেন — পরাজয় স্বীকার`,
+      agreement: 'চুক্তিতে ড্র',
     };
-    return (map[type] || 'Game over') + (winner === this.playerColor ? ' — You win!' : '');
+    return (map[type] || 'খেলা শেষ') + (winner === this.playerColor ? ' — আপনি জিতেছেন!' : '');
   }
 
   _newGame() {
@@ -323,19 +323,19 @@ class App {
   _players() {
     const s = this.getSettingsSide();
     if (this.mode === 'online') {
-      const me = 'Player';
+      const me = 'খেলোয়াড়';
       return {
-        w: { name: this.playerColor === 'w' ? (s.name || 'You') : (this.opponentName() || 'Opponent') },
-        b: { name: this.playerColor === 'b' ? (s.name || 'You') : (this.opponentName() || 'Opponent') },
+        w: { name: this.playerColor === 'w' ? (s.name || 'আপনি') : (this.opponentName() || 'প্রতিপক্ষ') },
+        b: { name: this.playerColor === 'b' ? (s.name || 'আপনি') : (this.opponentName() || 'প্রতিপক্ষ') },
       };
     }
     if (this.mode === 'ai') {
       return {
-        w: { name: s.side === 'b' ? 'AI' : (s.name || 'You') },
-        b: { name: s.side === 'w' ? 'AI' : (s.name || 'You') },
+        w: { name: s.side === 'b' ? 'কম্পিউটার' : (s.name || 'আপনি') },
+        b: { name: s.side === 'w' ? 'কম্পিউটার' : (s.name || 'আপনি') },
       };
     }
-    return { w: { name: 'White' }, b: { name: 'Black' } };
+    return { w: { name: 'সবুজ' }, b: { name: 'লাল' } };
   }
 
   getSettingsSide() {
@@ -343,7 +343,7 @@ class App {
   }
 
   opponentName() {
-    return (this.netName || 'Opponent');
+    return (this.netName || 'প্রতিপক্ষ');
   }
 
   // ------- board input -------
@@ -473,7 +473,7 @@ class App {
         });
       })
       .catch(() => {
-        toast('Move rejected by server', { layer: this.toastLayer, type: 'error' });
+        toast('সার্ভার মুভটি প্রত্যাখ্যান করেছে', { layer: this.toastLayer, type: 'error' });
         this._moveInFlight = false;
         this._lastSentMove = null;
         this.selected = -1;
@@ -547,16 +547,16 @@ class App {
 
   _gameOverPayload(res, winnerColor, win) {
     const resTxt = {
-      checkmate: winnerColor === 'w' ? 'White wins by checkmate' : 'Black wins by checkmate',
-      stalemate: 'Draw by stalemate',
-      insufficient: 'Draw by insufficient material',
-      fifty: 'Draw by 50-move rule',
-      threefold: 'Draw by threefold repetition',
+      checkmate: winnerColor === 'w' ? 'সবুজ কিস্তিমাতে জিতেছে' : 'লাল কিস্তিমাতে জিতেছে',
+      stalemate: 'স্টালমেটে ড্র',
+      insufficient: 'অপর্যাপ্ত গুটিতে ড্র',
+      fifty: '৫০-মুভ নিয়মে ড্র',
+      threefold: 'তিনবার পুনরাবৃত্তিতে ড্র',
     };
-    const title = resTxt[res.type] || 'Game Over';
+    const title = resTxt[res.type] || 'খেলা শেষ';
     return {
       title,
-      subtitle: res.type === 'checkmate' ? 'Checkmate' : res.type === 'stalemate' ? 'Stalemate' : '',
+      subtitle: res.type === 'checkmate' ? 'কিস্তিমাত' : res.type === 'stalemate' ? 'প্যাট' : '',
       win,
       online: this.mode === 'online',
       onRematch: () => this._rematch(),
@@ -590,7 +590,7 @@ class App {
     if (this.mode !== 'ai' || this.aiThinking) return;
     if (this.game.turn === this.bottomColor) return;
     this.aiThinking = true;
-    this.hud.setStatus('AI thinking…', 'thinking');
+    this.hud.setStatus('কম্পিউটার ভাবছে…', 'thinking');
     const difficulty = this.settings.difficulty;
     const cfg = level(difficulty);
     setTimeout(() => {
@@ -619,15 +619,15 @@ class App {
   }
 
   _statusText() {
-    const t = this.game.turn === 'w' ? 'White' : 'Black';
-    if (this.game.inCheck()) return t + ' to move — Check!';
-    return t + ' to move';
+    const t = this.game.turn === 'w' ? 'সবুজ' : 'লাল';
+    if (this.game.inCheck()) return t + ' এর পালা — কিস্তি!';
+    return t + ' এর পালা';
   }
 
   _title() {
-    if (this.mode === 'online') return 'Online Match';
-    if (this.mode === 'ai') return 'vs AI';
-    return 'Hotseat';
+    if (this.mode === 'online') return 'অনলাইন ম্যাচ';
+    if (this.mode === 'ai') return 'কম্পিউটারের বিরুদ্ধে';
+    return 'একই ডিভাইসে';
   }
 
   _rematch() {
@@ -656,9 +656,9 @@ class App {
       onResign: () => {
         if (this.mode === 'online') {
           this.net && this.net.resign();
-          this._end({ title: 'You resigned', subtitle: 'You resigned the game.', win: false, online: true });
+          this._end({ title: 'আপনি পরাজয় স্বীকার করেছেন', subtitle: 'আপনি খেলাটি ছেড়ে দিয়েছেন।', win: false, online: true });
         } else {
-          this._end({ title: 'You resigned', subtitle: 'You resigned the game.', win: false });
+          this._end({ title: 'আপনি পরাজয় স্বীকার করেছেন', subtitle: 'আপনি খেলাটি ছেড়ে দিয়েছেন।', win: false });
         }
       },
       onNewGame: () => { this._newGame(); this._renderBoardScreen(); },

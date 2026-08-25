@@ -58,15 +58,15 @@ export class ScreenFX {
 export function bindFX(floating, screenFx, getBoardRect) {
   on('capture', (e) => {
     const r = getBoardRect();
-    floating.show('+1', r.cx(e.square), r.cy(e.square), { color: '#E0604E' });
+    floating.show('+১', r.cx(e.square), r.cy(e.square), { color: '#E0993A' });
   });
   on('promote', (e) => {
     const r = getBoardRect();
-    floating.show('PROMOTION!', r.cx(e.square), r.cy(e.square) - 12, { color: '#D8B24A' });
+    floating.show('পদোন্নতি!', r.cx(e.square), r.cy(e.square) - 12, { color: '#D8B24A' });
   });
   on('check', (e) => {
     const r = getBoardRect();
-    floating.show('Check!', r.cx(e.square), r.cy(e.square) - 16, { color: '#E0604E' });
+    floating.show('কিস্তি!', r.cx(e.square), r.cy(e.square) - 16, { color: '#D45F4C' });
     screenFx.vignette();
   });
   on('gameOver', (e) => {

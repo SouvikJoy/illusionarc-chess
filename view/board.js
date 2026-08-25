@@ -5,8 +5,10 @@
 // markers are rendered as mini piece silhouettes inside target tiles.
 import { PIECE_DEFS } from './piece-defs.js';
 import { nameOfSquare, kindOf, colorOf, codeOf, EMPTY } from '../engine/core.js';
+import { spriteImg } from './pieces.js';
 
 const KIND_ID = { P: 'regal-pawn', N: 'regal-knight', B: 'regal-bishop', R: 'regal-rook', Q: 'regal-queen', K: 'regal-king' };
+const BN = ['০', '১', '২', '৩', '৪', '৫', '৬', '৭', '৮', '৯'];
 
 export class BoardView {
   constructor(container) {
@@ -19,15 +21,7 @@ export class BoardView {
   }
 
   // inject shared SVG defs once (per document)
-  static ensureDefs() {
-    if (document.getElementById('regal-piece-defs')) return;
-    const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-    svg.setAttribute('class', 'regal-defs');
-    svg.setAttribute('aria-hidden', 'true');
-    svg.id = 'regal-piece-defs';
-    svg.innerHTML = PIECE_DEFS;
-    document.body.appendChild(svg);
-  }
+  static ensureDefs() {}
 
   build() {
     BoardView.ensureDefs();
@@ -62,7 +56,7 @@ export class BoardView {
         tile.type = 'button';
         tile.dataset.idx = String(r * 8 + c);
         tile.dataset.sq = nameOfSquare(r * 8 + c);
-        tile.dataset.rank = String(8 - r);
+        tile.dataset.rank = BN[8 - r];
         tile.dataset.file = String.fromCharCode(97 + c);
         rowEl.appendChild(tile);
         this.tiles[`${r}-${c}`] = tile;
@@ -114,7 +108,7 @@ export class BoardView {
       // shape
       const id = KIND_ID[p.kind] || 'regal-pawn';
       if (el.dataset.shape !== id) {
-        el.innerHTML = svgUse(id);
+        el.innerHTML = spriteImg(p.kind, p.color);
         el.dataset.shape = id;
       }
     }
@@ -166,9 +160,10 @@ export class BoardView {
   setPieceShape(idx, kind) {
     const el = this.pieceEls.get(idx);
     if (!el) return;
-    const id = KIND_ID[kind];
+    const id = KIND_ID[kind] || 'regal-queen';
+    const color = el.classList.contains('black') ? 'b' : 'w';
     el.dataset.shape = id;
-    el.innerHTML = svgUse(id);
+    el.innerHTML = spriteImg(kind, color);
   }
 
   // position by engine idx for consistency
@@ -202,19 +197,21 @@ export class BoardView {
     const selTile = this.tileOf(fromIdx);
     if (selTile) selTile.classList.add('highlight-active');
 
-    // marker piece shape (the selected piece's silhouette, mini)
+    // marker piece sprite (the selected piece's silhouette/colour, mini)
     const selKind = selEl ? selEl.dataset.shape : null;
-    const marker = selKind ? svgUse(selKind) : '';
+    const selColor = selEl ? (selEl.classList.contains('black') ? 'b' : 'w') : 'w';
+    const k = selKind ? shapeKind(selKind) : null;
+    const marker = k ? spriteImg(k, selColor) : '';
 
     for (const mv of targets) {
       const tile = this.tileOf(mv.to);
       if (!tile) continue;
       if (mv.captured) {
         tile.classList.add('highlight-capture');
-        tile.appendChild(captureMarkers(marker));
+        tile.appendChild(captureMarkers(marker, selKind));
       } else {
         tile.classList.add('highlight-move');
-        tile.appendChild(moveMarker(marker));
+        tile.appendChild(moveMarker(marker, selKind));
       }
     }
   }
@@ -245,23 +242,27 @@ export class BoardView {
   resize() {}
 }
 
-// Mini move marker: a centered translucent piece silhouette.
-function moveMarker(shape) {
+// Mini move marker: a centered translucent piece sprite (sized like a real piece).
+function moveMarker(img, shape) {
   const d = document.createElement('div');
   d.className = 'move';
-  d.innerHTML = shape;
+  if (shape) d.dataset.shape = shape;
+  d.innerHTML = img;
   return d;
 }
 
-// Mini capture markers: piece silhouettes clustered near corners (like reference).
-function captureMarkers(shape) {
+// Mini capture markers: piece sprites clustered near corners (like reference).
+function captureMarkers(img, shape) {
   const d = document.createElement('div');
   d.className = 'captures';
+  if (shape) d.dataset.shape = shape;
   // repeat 4 ghost pieces to suggest a bite, matching reference style
-  d.innerHTML = shape + shape + shape + shape;
+  d.innerHTML = img + img + img + img;
   return d;
 }
 
-function svgUse(id) {
-  return `<svg class="${id === 'regal-king' ? 'king' : ''}" viewBox="0 0 170 170" fill="none" xmlns="http://www.w3.org/2000/svg"><use href="#${id}" /></svg>`;
+// Map a def id (e.g. "regal-knight") back to its engine kind letter.
+function shapeKind(id) {
+  for (const k in KIND_ID) if (KIND_ID[k] === id) return k;
+  return 'P';
 }

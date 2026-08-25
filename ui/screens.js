@@ -53,42 +53,54 @@ export class Screens {
   showMenu() {
     const c = this.clear();
     c.appendChild(el('div', { class: 'menu-bg bg-motif' }));
+    const frame = el('div', { class: 'menu-frame' });
+    const inner = el('div', { class: 'menu-inner' });
     const header = el('div', { class: 'menu-header' }, [
-      el('div', { class: 'menu-logo', 'aria-hidden': 'true' }, CHESS_GLYPH),
-      el('h1', { class: 'menu-title' }, 'Regal Chess'),
-      el('div', { class: 'menu-tagline' }, 'Play the timeless game'),
+      el('img', { class: 'menu-logo', src: 'assets/menu/logo.png', alt: '' }),
+      el('img', { class: 'menu-title', src: 'assets/menu/title.png', alt: 'দাবা' }),
+      el('img', { class: 'orn-divider', src: 'assets/menu/divider.png', alt: '' }),
+      el('img', { class: 'menu-tagline', src: 'assets/menu/tagline.png', alt: 'ঐতিহ্যবাহী খেলা — চিরন্তন দাবা' }),
     ]);
     const content = el('div', { class: 'menu-content' }, [
-      button('Play Online', () => this.showLobby(), { variant: 'primary', icon: '🌐' }),
-      button('Play vs AI', () => this.onModeRef('ai'), { variant: 'secondary', icon: '🤖' }),
-      button('Hotseat', () => this.onModeRef('hotseat'), { variant: 'secondary', icon: '♟' }),
-      button('Settings', () => this.showSettings(() => this.showMenu()), { variant: 'secondary', icon: '⚙' }),
+      this._menuBtn('btn-online', 'অনলাইনে খেলুন', () => this.showLobby()),
+      this._menuBtn('btn-ai', 'কম্পিউটারের বিরুদ্ধে', () => this.onModeRef('ai')),
+      this._menuBtn('btn-hotseat', 'একই ডিভাইসে', () => this.onModeRef('hotseat')),
+      this._menuBtn('btn-settings', 'সেটিংস', () => this.showSettings(() => this.showMenu())),
     ]);
     const footer = el('div', { class: 'menu-footer' }, [
-      el('span', { class: 'version' }, 'v1.0'),
+      el('img', { class: 'menu-ver', src: 'assets/menu/banner-v1.png', alt: 'v1.0' }),
     ]);
-    c.append(header, content, footer);
+    inner.append(header, content, footer);
+    frame.appendChild(inner);
+    c.append(el('div', { class: 'menu-stage' }, frame));
+  }
+
+  // Painted plate buttons (label/icon baked into the asset) for the main menu.
+  _menuBtn(cls, aria, onClick) {
+    const b = el('button', { class: `menu-btn ${cls}`, type: 'button', 'aria-label': aria });
+    b.addEventListener('click', () => { playSfx('click'); onClick && onClick(); });
+    return b;
   }
 
   // ---------- lobby (online) ----------
   showLobby() {
     const c = this.clear();
     c.appendChild(el('div', { class: 'menu-bg bg-motif' }));
-    const back = button('← Back', () => this.showMenu(), { variant: 'utility' });
+    const back = button('← ফিরে যান', () => this.showMenu(), { variant: 'utility' });
     const join = (host) => {
       const codeInput = c.querySelector('#roomCode');
       const code = codeInput ? codeInput.value.trim().toUpperCase() : '';
       this.onOnlineRef('join', code);
     };
-    const hostBtn = button('Create Room', () => this.onOnlineRef('host'), { variant: 'primary' });
-    const joinBtn = button('Join Room', null, { variant: 'secondary' });
+    const hostBtn = button('রুম তৈরি করুন', () => this.onOnlineRef('host'), { variant: 'primary' });
+    const joinBtn = button('রুমে যোগ দিন', null, { variant: 'secondary' });
 
-    const panel = card('Play Online', [
-      el('p', { class: 'hint' }, 'Create a room and share the code, or join a friend\u2019s room.'),
+    const panel = card('অনলাইনে খেলুন', [
+      el('p', { class: 'hint' }, 'একটি রুম তৈরি করে কোডটি শেয়ার করুন, অথবা বন্ধুর রুমে যোগ দিন।'),
       hostBtn,
-      el('div', { class: 'divider' }, 'or'),
+      el('div', { class: 'divider' }, 'অথবা'),
       el('div', { class: 'join-row' }, [
-        el('input', { id: 'roomCode', class: 'input room-input', placeholder: 'Room code', maxlength: '6', autocomplete: 'off', spellcheck: 'false' }),
+        el('input', { id: 'roomCode', class: 'input room-input', placeholder: 'রুম কোড', maxlength: '6', autocomplete: 'off', spellcheck: 'false' }),
         joinBtn,
       ]),
       el('div', { id: 'lobby-status', class: 'lobby-status' }),
@@ -110,7 +122,7 @@ export class Screens {
     const board = el('div', { class: 'board-screen' });
     const toolbar = el('div', { class: 'board-toolbar' }, [
       button('☰', () => (opts.onPause ? opts.onPause() : this.showPause()), { variant: 'utility', icon: '' }),
-      el('span', { class: 'toolbar-title' }, opts.title || 'Regal Chess'),
+      el('span', { class: 'toolbar-title' }, opts.title || 'দাবা'),
       button('⚙', () => opts.onSettings ? opts.onSettings() : this.showSettings(() => this.showBoard(opts)), { variant: 'utility' }),
     ]);
     // main row: board + HUD side-by-side on desktop
@@ -128,15 +140,15 @@ export class Screens {
   showPause(opts = {}) {
     const c = this.clear();
     c.appendChild(el('div', { class: 'screen-overlay' }));
-    const back = button('Resume', () => opts.onResume && opts.onResume(), { variant: 'primary', icon: '▶' });
+    const back = button('চালিয়ে যান', () => opts.onResume && opts.onResume(), { variant: 'primary', icon: '▶' });
     const actions = [
       back,
-      button('Settings', () => this.showSettings(() => this.showPause(opts)), { variant: 'secondary' }),
-      button('Resign', () => opts.onResign && opts.onResign(), { variant: 'utility' }),
-      button('New Game', () => opts.onNewGame && opts.onNewGame(), { variant: 'utility' }),
-      button('Main Menu', () => opts.onMenu && opts.onMenu(), { variant: 'utility' }),
+      button('সেটিংস', () => this.showSettings(() => this.showPause(opts)), { variant: 'secondary' }),
+      button('পরাজয় স্বীকার করুন', () => opts.onResign && opts.onResign(), { variant: 'utility' }),
+      button('নতুন খেলা', () => opts.onNewGame && opts.onNewGame(), { variant: 'utility' }),
+      button('মূল মেনু', () => opts.onMenu && opts.onMenu(), { variant: 'utility' }),
     ];
-    const panel = card('Paused', actions);
+    const panel = card('বিরতি', actions);
     c.appendChild(el('div', { class: 'pause-panel' }, panel));
   }
 
@@ -160,7 +172,7 @@ export class Screens {
         });
         return bb;
       };
-      b.append(mk(true, 'On'), mk(false, 'Off'));
+      b.append(mk(true, 'চালু'), mk(false, 'বন্ধ'));
       return b;
     };
     const slider = (key) => {
@@ -184,41 +196,41 @@ export class Screens {
     diffSel.addEventListener('change', () => setVal('difficulty', diffSel.value));
 
     const sideSel = el('select', { class: 'input' }, [
-      ...['w', 'b', 'random'].map((v) => { const o = el('option', { value: v }, v === 'w' ? 'White' : v === 'b' ? 'Black' : 'Random'); if (s.side === v) o.selected = true; return o; }),
+      ...['w', 'b', 'random'].map((v) => { const o = el('option', { value: v }, v === 'w' ? 'সবুজ' : v === 'b' ? 'লাল' : 'এলোমেলো'); if (s.side === v) o.selected = true; return o; }),
     ]);
     sideSel.addEventListener('change', () => setVal('side', sideSel.value));
 
-    body.append(this._group('Gameplay', [
-      this._field('AI Difficulty', diffSel),
-      this._field('Your side (vs AI)', sideSel),
-      this._field('Show legal moves', toggle('showLegalMoves', s.showLegalMoves)),
-      this._field('Show coordinates', toggle('showCoordinates', s.showCoordinates)),
-      this._field('Show last move', toggle('showLastMove', s.showLastMove)),
+    body.append(this._group('খেলা', [
+      this._field('কম্পিউটারের স্তর', diffSel),
+      this._field('আপনার রং (কম্পিউটারের বিরুদ্ধে)', sideSel),
+      this._field('বৈধ চাল দেখান', toggle('showLegalMoves', s.showLegalMoves)),
+      this._field('কোঅর্ডিনেট দেখান', toggle('showCoordinates', s.showCoordinates)),
+      this._field('শেষ চাল দেখান', toggle('showLastMove', s.showLastMove)),
     ]));
 
     // Audio
-    body.append(this._group('Audio', [
-      this._field('SFX', slider('sfxVolume')),
-      this._field('Music', slider('musicVolume')),
-      this._field('Master', slider('masterVolume')),
-      this._field('Ambient music', toggle('music', s.music)),
+    body.append(this._group('শব্দ', [
+      this._field('ইফেক্ট শব্দ', slider('sfxVolume')),
+      this._field('সঙ্গীত', slider('musicVolume')),
+      this._field('মূল ভলিউম', slider('masterVolume')),
+      this._field('ব্যাকগ্রাউন্ড সঙ্গীত', toggle('music', s.music)),
     ]));
 
     // Accessibility
-    body.append(this._group('Accessibility', [
-      this._field('Reduced motion', toggle('reducedMotion', s.reducedMotion)),
-      this._field('Color-blind mode', toggle('colorBlind', s.colorBlind)),
-      this._field('High contrast', toggle('highContrast', s.highContrast)),
-      this._field('UI scale', this._scaleSel(s.uiScale)),
+    body.append(this._group('সহজলভ্যতা', [
+      this._field('কম নড়াচড়া', toggle('reducedMotion', s.reducedMotion)),
+      this._field('রং-অন্ধ মোড', toggle('colorBlind', s.colorBlind)),
+      this._field('উচ্চ কনট্রাস্ট', toggle('highContrast', s.highContrast)),
+      this._field('ইউআই মাপ', this._scaleSel(s.uiScale)),
     ]));
 
-    const closeBtn = button('Close', () => this.closeSettingsPanel(), { variant: 'primary' });
-    const resetBtn = button('Reset to defaults', () => { const r = resetSettings(); applySettingsSideEffects(r); this.buildSettings(); this.openSettingsPanel(); }, { variant: 'utility' });
+    const closeBtn = button('বন্ধ করুন', () => this.closeSettingsPanel(), { variant: 'primary' });
+    const resetBtn = button('ডিফল্টে ফিরুন', () => { const r = resetSettings(); applySettingsSideEffects(r); this.buildSettings(); this.openSettingsPanel(); }, { variant: 'utility' });
     const footer = el('div', { class: 'settings-footer' }, [resetBtn, closeBtn]);
 
     // header
     const header = el('div', { class: 'settings-header' }, [
-      el('h2', { class: 'settings-title' }, 'Settings'),
+      el('h2', { class: 'settings-title' }, 'সেটিংস'),
       button('✕', () => this.closeSettingsPanel(), { variant: 'utility', icon: '' }),
     ]);
 
@@ -237,7 +249,7 @@ export class Screens {
 
   _scaleSel(current) {
     const sel = el('select', { class: 'input' }, ['small', 'normal', 'large'].map((v) => {
-      const o = el('option', { value: v }, v === 'small' ? 'Small' : v === 'normal' ? 'Normal' : 'Large');
+      const o = el('option', { value: v }, v === 'small' ? 'ছোট' : v === 'normal' ? 'সাধারণ' : 'বড়');
       if (current === v) o.selected = true;
       return o;
     }));
@@ -259,12 +271,12 @@ export class Screens {
     c.appendChild(el('div', { class: 'screen-overlay' }));
     const { title, subtitle, win, online, onRematch, onMenu, onReview, pgn } = payload;
     const actions = [];
-    if (onRematch) actions.push(button(online ? 'Request Rematch' : 'Rematch', () => onRematch(), { variant: 'primary', icon: '↻' }));
-    if (onReview) actions.push(button('Review Board', () => onReview(), { variant: 'secondary' }));
-    actions.push(button('Main Menu', () => onMenu && onMenu(), { variant: 'utility' }));
-    if (pgn) actions.push(button('Copy PGN', () => { navigator.clipboard && navigator.clipboard.writeText(pgn); toast('Game copied as PGN', { layer: this.toastLayer, type: 'info' }); }, { variant: 'utility' }));
+    if (onRematch) actions.push(button(online ? 'আবার খেলার প্রস্তাব দিন' : 'আবার খেলুন', () => onRematch(), { variant: 'primary', icon: '↻' }));
+    if (onReview) actions.push(button('বোর্ড দেখুন', () => onReview(), { variant: 'secondary' }));
+    actions.push(button('মূল মেনু', () => onMenu && onMenu(), { variant: 'utility' }));
+    if (pgn) actions.push(button('PGN কপি করুন', () => { navigator.clipboard && navigator.clipboard.writeText(pgn); toast('গেম PGN হিসেবে কপি হয়েছে', { layer: this.toastLayer, type: 'info' }); }, { variant: 'utility' }));
 
-    const panel = card('Game Over', [
+    const panel = card('খেলা শেষ', [
       el('div', { class: `result-banner ${win ? 'win' : 'draw'}` }, [
         el('div', { class: 'result-icon' }, win ? '🏆' : '🤝'),
         el('div', { class: 'result-title' }, title),

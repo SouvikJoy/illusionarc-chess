@@ -22,7 +22,7 @@ export class HUD {
         </div>
         <div class="hud-mid">
           <div class="hud-status" data-role="status"></div>
-          <button class="icon-btn hint-buddy" data-role="sound" title="Sound">🎵</button>
+          <button class="icon-btn hint-buddy" data-role="sound" title="শব্দ" aria-label="শব্দ">🎵</button>
         </div>
         <div class="hud-bottom">
           <div class="moves" data-role="moves"></div>
@@ -47,8 +47,8 @@ export class HUD {
     for (const color of ['w', 'b']) {
       const p = players[color] || {};
       const pc = this.playerEls[color];
-      pc.appendChild(el('div', { class: 'hud-avatar' }, p.name ? p.name.charAt(0).toUpperCase() : (color === 'w' ? 'W' : 'B')));
-      pc.appendChild(el('div', { class: 'hud-name' }, p.name || (color === 'w' ? 'White' : 'Black')));
+      pc.appendChild(el('div', { class: 'hud-avatar' }, p.name ? p.name.charAt(0).toUpperCase() : (color === 'w' ? 'স' : 'ল')));
+      pc.appendChild(el('div', { class: 'hud-name' }, p.name || (color === 'w' ? 'সবুজ' : 'লাল')));
     }
     this.players = players;
   }

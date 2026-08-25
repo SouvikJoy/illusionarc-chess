@@ -1,36 +1,40 @@
 // theme/tokens.js
-// Core design tokens (GDD §4.1-4.5, foundations.md, colors.md, typography.md,
-// motion.md).
+// Core design tokens — "দাবা" (Daba), a traditional Bengali chess.
+// Palette & typography are inspired by Bengal craft: terracotta clay, Bengal
+// red (লাল), brass/gold (সোনালি), indigo (নীল) and ivory/cream cloth.
+// See GAME_DESIGN_SYSTEM / core/colors.md & typography.md.
+
 export const colors = {
-  '--bg-background': '#0E1220',
-  '--bg-surface': '#1A2032',
-  '--bg-surface-elev': '#232B42',
-  '--fg-primary': '#F5F1E8',
-  '--fg-secondary': '#A9B2C6',
-  '--fg-muted': '#6C7690',
-  '--primary': '#D8B24A',
-  '--primary-hover': '#E6C766',
-  '--secondary': '#3E5C8B',
-  '--success': '#58C185',
-  '--error': '#E0604E',
-  '--warning': '#E6B24A',
-  '--info': '#5A8BD8',
-  '--board-light': '#F0E4CE',
-  '--board-dark': '#8A5A3B',
-  '--board-frame': '#241D14',
-  '--highlight-move': 'rgba(216,178,74,0.32)',
-  '--highlight-selected': 'rgba(216,178,74,0.52)',
-  '--highlight-check': 'rgba(224,96,78,0.60)',
-  '--highlight-last-move': 'rgba(90,139,216,0.28)',
-  '--scrim': 'rgba(8,10,18,0.62)',
-  '--shadow-1': '0 2px 8px rgba(0,0,0,0.28)',
-  '--shadow-2': '0 8px 24px rgba(0,0,0,0.34)',
-  '--shadow-3': '0 16px 48px rgba(0,0,0,0.42)',
+  '--bg-background': '#241813',
+  '--bg-surface': '#33241B',
+  '--bg-surface-elev': '#3F2C21',
+  '--fg-primary': '#F6ECDA',
+  '--fg-secondary': '#CBB89A',
+  '--fg-muted': '#9A8468',
+  '--primary': '#E0993A',
+  '--primary-hover': '#F0AD4E',
+  '--secondary': '#A8402E',
+  '--secondary-hover': '#C1503B',
+  '--success': '#7FB069',
+  '--error': '#D45F4C',
+  '--warning': '#E8A33D',
+  '--info': '#6A89A8',
+  '--board-light': '#EBD8A8',
+  '--board-dark': '#B5492F',
+  '--board-frame': '#2E1509',
+  '--highlight-move': 'rgba(224,153,58,0.32)',
+  '--highlight-selected': 'rgba(224,153,58,0.52)',
+  '--highlight-check': 'rgba(212,95,76,0.62)',
+  '--highlight-last-move': 'rgba(106,137,168,0.30)',
+  '--scrim': 'rgba(20,12,8,0.66)',
+  '--shadow-1': '0 2px 8px rgba(0,0,0,0.30)',
+  '--shadow-2': '0 8px 24px rgba(0,0,0,0.36)',
+  '--shadow-3': '0 16px 48px rgba(0,0,0,0.46)',
 };
 
 export const fonts = {
-  '--font-display': "'Playfair Display', Georgia, serif",
-  '--font-body': "'Inter', system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
+  '--font-display': "'Noto Serif Bengali', 'Noto Sans Bengali', Georgia, 'Songti SC', 'Times New Roman', serif",
+  '--font-body': "'Noto Sans Bengali', 'Hind Siliguri', system-ui, -apple-system, Segoe UI, Roboto, sans-serif",
 };
 
 export const spacing = {

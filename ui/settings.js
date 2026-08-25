@@ -1,7 +1,7 @@
 // ui/settings.js
 // Persisted settings (localStorage) with a single source of truth + subscribe.
 const DEFAULT = {
-  name: 'Player',
+  name: 'খেলোয়াড়',
   difficulty: 'medium',
   side: 'w',
   showLegalMoves: true,
@@ -17,7 +17,7 @@ const DEFAULT = {
   colorBlind: false,
   highContrast: false,
   uiScale: 'normal',
-  locale: 'en',
+  locale: 'bn',
 };
 
 const KEY = 'regal-chess-settings';
